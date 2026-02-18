@@ -102,7 +102,7 @@ function AgentCard({ agent, gatewayPort, gatewayToken }: { agent: Agent; gateway
         <div>
           <h3 className="text-lg font-semibold text-[var(--text)]">{agent.name}</h3>
           {agent.name !== agent.id && (
-            <span className="text-xs text-[var(--text-muted)]">ID: {agent.id}</span>
+            <span className="text-xs text-[var(--text-muted)]">agentId: {agent.id}</span>
           )}
         </div>
       </div>
