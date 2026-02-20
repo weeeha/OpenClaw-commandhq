@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useI18n, LanguageSwitcher } from "@/lib/i18n";
 
 interface Model {
   id: string;
@@ -61,6 +62,7 @@ function formatMs(ms: number): string {
 }
 
 export default function ModelsPage() {
+  const { t } = useI18n();
   const [data, setData] = useState<ConfigData | null>(null);
   const [modelStats, setModelStats] = useState<Record<string, ModelStat>>({});
   const [error, setError] = useState<string | null>(null);
@@ -88,18 +90,15 @@ export default function ModelsPage() {
 
   const testAllModels = async () => {
     if (!data) return;
-    // Collect all model+provider pairs
     const pairs: { provider: string; modelId: string }[] = [];
     for (const p of data.providers) {
       if (p.models.length > 0) {
         for (const m of p.models) pairs.push({ provider: p.id, modelId: m.id });
       } else {
-        // For providers without explicit models, check modelStats for known models
         const knownModels = Object.values(modelStats).filter(s => s.provider === p.id);
         for (const s of knownModels) pairs.push({ provider: s.provider, modelId: s.modelId });
       }
     }
-    // Run all tests in parallel
     for (const pair of pairs) {
       testModel(pair.provider, pair.modelId);
     }
@@ -127,7 +126,7 @@ export default function ModelsPage() {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-red-400">加载失败: {error}</p>
+        <p className="text-red-400">{t("common.loadError")}: {error}</p>
       </div>
     );
   }
@@ -135,7 +134,7 @@ export default function ModelsPage() {
   if (!data) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-[var(--text-muted)]">加载中...</p>
+        <p className="text-[var(--text-muted)]">{t("common.loading")}</p>
       </div>
     );
   }
@@ -145,10 +144,10 @@ export default function ModelsPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
-            OpenClaw接入模型列表
+            {t("models.title")}
           </h1>
           <p className="text-[var(--text-muted)] text-sm mt-1">
-            共 {data.providers.length} 个 Provider
+            {t("models.totalPrefix")} {data.providers.length} {t("models.providerCount")}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -161,14 +160,15 @@ export default function ModelsPage() {
                 : "bg-[var(--accent)] text-[var(--bg)] hover:opacity-90 cursor-pointer"
             }`}
           >
-            {Object.values(testing).some(Boolean) ? "⏳ 测试中..." : "🧪 测试全部模型"}
+            {Object.values(testing).some(Boolean) ? t("models.testingAll") : t("models.testAll")}
           </button>
           <Link
             href="/"
             className="px-4 py-2 rounded-lg bg-[var(--card)] border border-[var(--border)] text-sm font-medium hover:border-[var(--accent)] transition"
           >
-            ← 返回总览
+            {t("common.backOverview")}
           </Link>
+          <LanguageSwitcher />
         </div>
       </div>
 
@@ -187,7 +187,7 @@ export default function ModelsPage() {
               </div>
               {provider.usedBy.length > 0 && (
                 <div className="flex items-center gap-1">
-                  <span className="text-xs text-[var(--text-muted)] mr-1">使用中:</span>
+                  <span className="text-xs text-[var(--text-muted)] mr-1">{t("agent.inUse")}</span>
                   {provider.usedBy.map((a) => (
                     <span key={a.id} title={a.id} className="px-2 py-0.5 rounded-full bg-[var(--bg)] text-xs font-medium">
                       {a.emoji} {a.name || a.id}
@@ -202,16 +202,16 @@ export default function ModelsPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-[var(--text-muted)] text-xs border-b border-[var(--border)]">
-                      <th className="text-left py-2 pr-4">模型 ID</th>
-                      <th className="text-left py-2 pr-4">名称</th>
-                      <th className="text-left py-2 pr-4">上下文窗口</th>
-                      <th className="text-left py-2 pr-4">最大输出</th>
-                      <th className="text-left py-2 pr-4">输入类型</th>
-                      <th className="text-left py-2 pr-4">推理</th>
-                      <th className="text-right py-2 pr-4">Input 用量</th>
-                      <th className="text-right py-2 pr-4">Output 用量</th>
-                      <th className="text-right py-2 pr-4">平均响应</th>
-                      <th className="text-center py-2">测试</th>
+                      <th className="text-left py-2 pr-4">{t("models.colModelId")}</th>
+                      <th className="text-left py-2 pr-4">{t("models.colName")}</th>
+                      <th className="text-left py-2 pr-4">{t("models.colContext")}</th>
+                      <th className="text-left py-2 pr-4">{t("models.colMaxOutput")}</th>
+                      <th className="text-left py-2 pr-4">{t("models.colInputType")}</th>
+                      <th className="text-left py-2 pr-4">{t("models.colReasoning")}</th>
+                      <th className="text-right py-2 pr-4">{t("models.colInputToken")}</th>
+                      <th className="text-right py-2 pr-4">{t("models.colOutputToken")}</th>
+                      <th className="text-right py-2 pr-4">{t("models.colAvgResponse")}</th>
+                      <th className="text-center py-2">{t("models.colTest")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -228,12 +228,12 @@ export default function ModelsPage() {
                         <td className="py-2 pr-4">{formatNum(m.maxTokens)}</td>
                         <td className="py-2 pr-4">
                           <div className="flex gap-1">
-                            {(m.input || []).map((t) => (
+                            {(m.input || []).map((inputType) => (
                               <span
-                                key={t}
+                                key={inputType}
                                 className="px-1.5 py-0.5 rounded bg-[var(--bg)] text-xs"
                               >
-                                {t === "text" ? "📝" : "🖼️"} {t}
+                                {inputType === "text" ? "📝" : "🖼️"} {inputType}
                               </span>
                             ))}
                           </div>
@@ -253,7 +253,7 @@ export default function ModelsPage() {
                                   : "bg-[var(--accent)]/20 text-[var(--accent)] border border-[var(--accent)]/30 hover:bg-[var(--accent)]/40 cursor-pointer"
                               }`}
                             >
-                              {isTesting ? "⏳ 测试中..." : "🧪 测试"}
+                              {isTesting ? t("common.testing") : t("common.test")}
                             </button>
                             {result && (
                               <span className={`text-[10px] max-w-[140px] truncate ${result.ok ? "text-green-400" : "text-red-400"}`} title={result.ok ? result.text : result.error}>
@@ -271,10 +271,9 @@ export default function ModelsPage() {
             ) : (
               <div>
                 <p className="text-[var(--text-muted)] text-sm">
-                  无显式模型定义（通过 provider 名称推断）
+                  {t("models.noExplicitModels")}
                 </p>
                 {(() => {
-                  // Show aggregated stats for this provider even without explicit model defs
                   const providerStats = Object.values(modelStats).filter(s => s.provider === provider.id);
                   if (providerStats.length === 0) return null;
                   const totalInput = providerStats.reduce((s, m) => s + m.inputTokens, 0);
@@ -302,7 +301,7 @@ export default function ModelsPage() {
                                 : "bg-[var(--accent)]/20 text-[var(--accent)] border border-[var(--accent)]/30 hover:bg-[var(--accent)]/40 cursor-pointer"
                             }`}
                           >
-                            {isTesting ? "⏳" : "🧪 测试"}
+                            {isTesting ? "⏳" : t("common.test")}
                           </button>
                           {result && (
                             <span className={`text-[10px] ${result.ok ? "text-green-400" : "text-red-400"}`} title={result.ok ? result.text : result.error}>

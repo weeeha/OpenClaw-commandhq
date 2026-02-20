@@ -14,7 +14,7 @@ interface DayStat {
   responseTimes: number[]; // internal, stripped before response
 }
 
-function parseSessions(agentId: string): DayStat[] {
+function parseSessions(agentId: string): Omit<DayStat, "responseTimes">[] {
   const sessionsDir = path.join(OPENCLAW_HOME, `agents/${agentId}/sessions`);
   const dayMap: Record<string, DayStat> = {};
 

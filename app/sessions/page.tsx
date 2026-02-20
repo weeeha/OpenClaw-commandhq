@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useI18n, LanguageSwitcher } from "@/lib/i18n";
 
 interface Session {
   key: string;
@@ -20,27 +21,15 @@ interface GatewayInfo {
   token?: string;
 }
 
-const TYPE_LABELS: Record<string, { label: string; emoji: string; color: string }> = {
-  main: { label: "主会话", emoji: "🏠", color: "bg-green-500/20 text-green-300 border-green-500/30" },
-  "feishu-dm": { label: "飞书私聊", emoji: "📱", color: "bg-blue-500/20 text-blue-300 border-blue-500/30" },
-  "feishu-group": { label: "飞书群聊", emoji: "👥", color: "bg-blue-500/20 text-blue-300 border-blue-500/30" },
-  "discord-dm": { label: "Discord 私聊", emoji: "🎮", color: "bg-purple-500/20 text-purple-300 border-purple-500/30" },
-  "discord-channel": { label: "Discord 频道", emoji: "📢", color: "bg-purple-500/20 text-purple-300 border-purple-500/30" },
-  cron: { label: "定时任务", emoji: "⏰", color: "bg-yellow-500/20 text-yellow-300 border-yellow-500/30" },
-  unknown: { label: "未知", emoji: "❓", color: "bg-gray-500/20 text-gray-300 border-gray-500/30" },
+const TYPE_EMOJI_COLOR: Record<string, { emoji: string; color: string }> = {
+  main: { emoji: "🏠", color: "bg-green-500/20 text-green-300 border-green-500/30" },
+  "feishu-dm": { emoji: "📱", color: "bg-blue-500/20 text-blue-300 border-blue-500/30" },
+  "feishu-group": { emoji: "👥", color: "bg-blue-500/20 text-blue-300 border-blue-500/30" },
+  "discord-dm": { emoji: "🎮", color: "bg-purple-500/20 text-purple-300 border-purple-500/30" },
+  "discord-channel": { emoji: "📢", color: "bg-purple-500/20 text-purple-300 border-purple-500/30" },
+  cron: { emoji: "⏰", color: "bg-yellow-500/20 text-yellow-300 border-yellow-500/30" },
+  unknown: { emoji: "❓", color: "bg-gray-500/20 text-gray-300 border-gray-500/30" },
 };
-
-function formatTimeAgo(ts: number): string {
-  if (!ts) return "-";
-  const diff = Date.now() - ts;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "刚刚";
-  if (mins < 60) return `${mins} 分钟前`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} 小时前`;
-  const days = Math.floor(hours / 24);
-  return `${days} 天前`;
-}
 
 function formatTime(ts: number): string {
   if (!ts) return "-";
@@ -54,10 +43,29 @@ export default function SessionsPage() {
   const [gateway, setGateway] = useState<GatewayInfo>({ port: 18789 });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const { t } = useI18n();
+
+  function formatTimeAgo(ts: number): string {
+    if (!ts) return "-";
+    const diff = Date.now() - ts;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return t("common.justNow");
+    if (mins < 60) return `${mins} ${t("common.minutesAgo")}`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours} ${t("common.hoursAgo")}`;
+    const days = Math.floor(hours / 24);
+    return `${days} ${t("common.daysAgo")}`;
+  }
+
+  function getTypeLabel(type: string): { label: string; emoji: string; color: string } {
+    const info = TYPE_EMOJI_COLOR[type] || TYPE_EMOJI_COLOR.unknown;
+    const labelKey = `sessions.type.${type}` as const;
+    const label = t(TYPE_EMOJI_COLOR[type] ? labelKey : "sessions.type.unknown");
+    return { ...info, label };
+  }
 
   useEffect(() => {
     if (!agentId) return;
-    // 并行获取 sessions 和 gateway 配置
     Promise.all([
       fetch(`/api/sessions/${agentId}`).then((r) => r.json()),
       fetch("/api/config").then((r) => r.json()),
@@ -74,7 +82,7 @@ export default function SessionsPage() {
   if (!agentId) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-red-400">缺少 agent 参数</p>
+        <p className="text-red-400">{t("sessions.missingAgent")}</p>
       </div>
     );
   }
@@ -82,7 +90,7 @@ export default function SessionsPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-[var(--text-muted)]">加载中...</p>
+        <p className="text-[var(--text-muted)]">{t("common.loading")}</p>
       </div>
     );
   }
@@ -90,7 +98,7 @@ export default function SessionsPage() {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-red-400">加载失败: {error}</p>
+        <p className="text-red-400">{t("common.loadError")}: {error}</p>
       </div>
     );
   }
@@ -101,28 +109,32 @@ export default function SessionsPage() {
     <main className="min-h-screen p-8 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">📋 {agentId} 的会话列表</h1>
+          <h1 className="text-2xl font-bold">📋 {agentId} {t("sessions.title")}</h1>
           <p className="text-[var(--text-muted)] text-sm mt-1">
-            共 {sessions.length} 个会话 · 总 Token: {(totalTokens / 1000).toFixed(1)}k
+            {sessions.length} {t("sessions.sessionCount")} · {t("sessions.totalToken")}: {(totalTokens / 1000).toFixed(1)}k
           </p>
         </div>
-        <Link
-          href="/"
-          className="px-4 py-2 rounded-lg bg-[var(--card)] border border-[var(--border)] text-sm hover:border-[var(--accent)] transition"
-        >
-          ← 返回首页
-        </Link>
+        <div className="flex items-center gap-3">
+          <LanguageSwitcher />
+          <Link
+            href="/"
+            className="px-4 py-2 rounded-lg bg-[var(--card)] border border-[var(--border)] text-sm hover:border-[var(--accent)] transition"
+          >
+            {t("common.backHome")}
+          </Link>
+        </div>
       </div>
 
       <div className="space-y-3">
         {sessions.map((s) => {
-          const typeInfo = TYPE_LABELS[s.type] || TYPE_LABELS.unknown;
+          const typeInfo = getTypeLabel(s.type);
           let chatUrl = `http://localhost:${gateway.port}/chat?session=${encodeURIComponent(s.key)}`;
           if (gateway.token) chatUrl += `&token=${encodeURIComponent(gateway.token)}`;
           return (
             <div
               key={s.key}
               onClick={() => window.open(chatUrl, "_blank")}
+              title={t("agent.openChat")}
               className="p-4 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:border-[var(--accent)] transition cursor-pointer"
             >
               <div className="flex items-center justify-between mb-2">

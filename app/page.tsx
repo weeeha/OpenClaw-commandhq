@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
+import { useI18n, LanguageSwitcher } from "@/lib/i18n";
 
 interface Platform {
   name: string;
@@ -54,7 +55,8 @@ interface AllStats {
 }
 
 type TimeRange = "daily" | "weekly" | "monthly";
-const RANGE_LABELS: Record<TimeRange, string> = { daily: "按天", weekly: "按周", monthly: "按月" };
+
+type TFunc = (key: string) => string;
 
 function formatTokens(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
@@ -69,8 +71,8 @@ function formatMs(ms: number): string {
 }
 
 // 趋势折线图
-function TrendChart({ data, lines, height = 180 }: { data: DayStat[]; lines: { key: keyof DayStat; color: string; label: string }[]; height?: number }) {
-  if (data.length === 0) return <div className="flex items-center justify-center h-32 text-[var(--text-muted)] text-sm">暂无数据</div>;
+function TrendChart({ data, lines, height = 180, t }: { data: DayStat[]; lines: { key: keyof DayStat; color: string; label: string }[]; height?: number; t: TFunc }) {
+  if (data.length === 0) return <div className="flex items-center justify-center h-32 text-[var(--text-muted)] text-sm">{t("common.noData")}</div>;
 
   const pad = { top: 16, right: 16, bottom: 50, left: 56 };
   const width = Math.max(500, data.length * 56 + pad.left + pad.right);
@@ -116,9 +118,9 @@ function TrendChart({ data, lines, height = 180 }: { data: DayStat[]; lines: { k
 }
 
 // 响应时间趋势图
-function ResponseTrendChart({ data, height = 180 }: { data: DayStat[]; height?: number }) {
+function ResponseTrendChart({ data, height = 180, t }: { data: DayStat[]; height?: number; t: TFunc }) {
   const filtered = data.filter(d => d.avgResponseMs > 0);
-  if (filtered.length === 0) return <div className="flex items-center justify-center h-32 text-[var(--text-muted)] text-sm">暂无响应时间数据</div>;
+  if (filtered.length === 0) return <div className="flex items-center justify-center h-32 text-[var(--text-muted)] text-sm">{t("home.noResponseData")}</div>;
 
   const pad = { top: 16, right: 16, bottom: 50, left: 56 };
   const width = Math.max(500, filtered.length * 56 + pad.left + pad.right);
@@ -158,20 +160,8 @@ function ResponseTrendChart({ data, height = 180 }: { data: DayStat[]; height?: 
   );
 }
 
-// 时间格式化
-function formatTimeAgo(ts: number): string {
-  const diff = Date.now() - ts;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "刚刚";
-  if (mins < 60) return `${mins} 分钟前`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} 小时前`;
-  const days = Math.floor(hours / 24);
-  return `${days} 天前`;
-}
-
-// 平台标签颜色（可点击跳转到对应平台的 session chat 页面）
-function PlatformBadge({ platform, agentId, gatewayPort, gatewayToken }: { platform: Platform; agentId: string; gatewayPort: number; gatewayToken?: string }) {
+// 平台标签颜色
+function PlatformBadge({ platform, agentId, gatewayPort, gatewayToken, t }: { platform: Platform; agentId: string; gatewayPort: number; gatewayToken?: string; t: TFunc }) {
   const isFeishu = platform.name === "feishu";
 
   let sessionKey: string;
@@ -191,14 +181,14 @@ function PlatformBadge({ platform, agentId, gatewayPort, gatewayToken }: { platf
       target="_blank"
       rel="noopener noreferrer"
       onClick={(e) => e.stopPropagation()}
-      title="点击打开聊天页面"
+      title={t("agent.openChat")}
       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-all hover:scale-105 hover:shadow-md ${
         isFeishu
           ? "bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/40 hover:border-blue-400"
           : "bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/40 hover:border-purple-400"
       }`}
     >
-      {isFeishu ? "📱 飞书" : "🎮 Discord"}
+      {isFeishu ? t("platform.feishu") : t("platform.discord")}
       {platform.accountId && (
         <span className="opacity-60">({platform.accountId})</span>
       )}
@@ -231,11 +221,22 @@ function ModelBadge({ model }: { model: string }) {
   );
 }
 
-// Agent 卡片（点击跳转到 agent 的 main session chat 页面）
-function AgentCard({ agent, gatewayPort, gatewayToken }: { agent: Agent; gatewayPort: number; gatewayToken?: string }) {
+// Agent 卡片
+function AgentCard({ agent, gatewayPort, gatewayToken, t }: { agent: Agent; gatewayPort: number; gatewayToken?: string; t: TFunc }) {
   const sessionKey = `agent:${agent.id}:main`;
   let sessionUrl = `http://localhost:${gatewayPort}/chat?session=${encodeURIComponent(sessionKey)}`;
   if (gatewayToken) sessionUrl += `&token=${encodeURIComponent(gatewayToken)}`;
+
+  function formatTimeAgo(ts: number): string {
+    const diff = Date.now() - ts;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return t("common.justNow");
+    if (mins < 60) return `${mins} ${t("common.minutesAgo")}`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours} ${t("common.hoursAgo")}`;
+    const days = Math.floor(hours / 24);
+    return `${days} ${t("common.daysAgo")}`;
+  }
 
   return (
     <div
@@ -254,22 +255,22 @@ function AgentCard({ agent, gatewayPort, gatewayToken }: { agent: Agent; gateway
 
       <div className="space-y-2">
         <div>
-          <span className="text-xs text-[var(--text-muted)] block mb-1">模型</span>
+          <span className="text-xs text-[var(--text-muted)] block mb-1">{t("agent.model")}</span>
           <ModelBadge model={agent.model} />
         </div>
 
         <div>
-          <span className="text-xs text-[var(--text-muted)] block mb-1">平台</span>
+          <span className="text-xs text-[var(--text-muted)] block mb-1">{t("agent.platform")}</span>
           <div className="flex flex-wrap gap-1">
             {agent.platforms.map((p, i) => (
-              <PlatformBadge key={i} platform={p} agentId={agent.id} gatewayPort={gatewayPort} gatewayToken={gatewayToken} />
+              <PlatformBadge key={i} platform={p} agentId={agent.id} gatewayPort={gatewayPort} gatewayToken={gatewayToken} t={t} />
             ))}
           </div>
         </div>
 
         {agent.platforms.some((p) => p.appId) && (
           <div>
-            <span className="text-xs text-[var(--text-muted)] block mb-1">飞书 App ID</span>
+            <span className="text-xs text-[var(--text-muted)] block mb-1">{t("agent.feishuAppId")}</span>
             <code className="text-xs text-[var(--accent)] bg-[var(--bg)] px-2 py-0.5 rounded">
               {agent.platforms.find((p) => p.appId)?.appId}
             </code>
@@ -279,7 +280,7 @@ function AgentCard({ agent, gatewayPort, gatewayToken }: { agent: Agent; gateway
         {agent.session && (
           <div className="pt-2 mt-2 border-t border-[var(--border)]">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-[var(--text-muted)]">会话数</span>
+              <span className="text-[var(--text-muted)]">{t("agent.sessionCount")}</span>
               <div className="flex items-center gap-2">
                 <a
                   href={`/sessions?agent=${agent.id}`}
@@ -293,17 +294,17 @@ function AgentCard({ agent, gatewayPort, gatewayToken }: { agent: Agent; gateway
                   onClick={(e) => e.stopPropagation()}
                   className="text-[var(--accent)] hover:underline cursor-pointer text-[10px]"
                 >
-                  📊 统计
+                  📊 {t("agent.stats")}
                 </a>
               </div>
             </div>
             <div className="flex items-center justify-between text-xs mt-1">
-              <span className="text-[var(--text-muted)]">Token 用量</span>
+              <span className="text-[var(--text-muted)]">{t("agent.tokenUsage")}</span>
               <span className="text-[var(--text)]">{(agent.session.totalTokens / 1000).toFixed(1)}k</span>
             </div>
             {agent.session.lastActive && (
               <div className="flex items-center justify-between text-xs mt-1">
-                <span className="text-[var(--text-muted)]">最近活跃</span>
+                <span className="text-[var(--text-muted)]">{t("agent.lastActive")}</span>
                 <span className="text-[var(--text)]">{formatTimeAgo(agent.session.lastActive)}</span>
               </div>
             )}
@@ -314,17 +315,8 @@ function AgentCard({ agent, gatewayPort, gatewayToken }: { agent: Agent; gateway
   );
 }
 
-// 刷新选项
-const REFRESH_OPTIONS = [
-  { label: "手动刷新", value: 0 },
-  { label: "10 秒", value: 10 },
-  { label: "30 秒", value: 30 },
-  { label: "1 分钟", value: 60 },
-  { label: "5 分钟", value: 300 },
-  { label: "10 分钟", value: 600 },
-];
-
 export default function Home() {
+  const { t } = useI18n();
   const [data, setData] = useState<ConfigData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshInterval, setRefreshInterval] = useState(0);
@@ -333,6 +325,17 @@ export default function Home() {
   const [allStats, setAllStats] = useState<AllStats | null>(null);
   const [statsRange, setStatsRange] = useState<TimeRange>("daily");
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const RANGE_LABELS: Record<TimeRange, string> = { daily: t("range.daily"), weekly: t("range.weekly"), monthly: t("range.monthly") };
+
+  const REFRESH_OPTIONS = [
+    { label: t("refresh.manual"), value: 0 },
+    { label: t("refresh.10s"), value: 10 },
+    { label: t("refresh.30s"), value: 30 },
+    { label: t("refresh.1m"), value: 60 },
+    { label: t("refresh.5m"), value: 300 },
+    { label: t("refresh.10m"), value: 600 },
+  ];
 
   const fetchData = useCallback(() => {
     setLoading(true);
@@ -365,7 +368,7 @@ export default function Home() {
   if (error && !data) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-red-400">加载失败: {error}</p>
+        <p className="text-red-400">{t("common.loadError")}: {error}</p>
       </div>
     );
   }
@@ -373,7 +376,7 @@ export default function Home() {
   if (!data) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-[var(--text-muted)]">加载中...</p>
+        <p className="text-[var(--text-muted)]">{t("common.loading")}</p>
       </div>
     );
   }
@@ -384,10 +387,10 @@ export default function Home() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
-            🐾 OpenClaw Bot Dashboard
+            {t("home.title")}
           </h1>
           <p className="text-[var(--text-muted)] text-sm mt-1">
-            共 {data.agents.length} 个机器人 · 默认模型: {data.defaults.model}
+            {t("models.totalPrefix")} {data.agents.length} {t("home.agentCount")} · {t("home.defaultModel")}: {data.defaults.model}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -400,7 +403,7 @@ export default function Home() {
             >
               {REFRESH_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
-                  {opt.value === 0 ? "🔄 手动刷新" : `⏱️ ${opt.label}`}
+                  {opt.value === 0 ? `🔄 ${opt.label}` : `⏱️ ${opt.label}`}
                 </option>
               ))}
             </select>
@@ -416,22 +419,29 @@ export default function Home() {
           </div>
           {lastUpdated && (
             <span className="text-xs text-[var(--text-muted)]">
-              更新于 {lastUpdated}
+              {t("home.updatedAt")} {lastUpdated}
             </span>
           )}
           <Link
             href="/models"
             className="px-4 py-2 rounded-lg bg-[var(--accent)] text-[var(--bg)] text-sm font-medium hover:opacity-90 transition"
           >
-            查看模型列表 →
+            {t("home.viewModels")}
           </Link>
+          <Link
+            href="/skills"
+            className="px-4 py-2 rounded-lg bg-[var(--card)] border border-[var(--border)] text-sm font-medium hover:border-[var(--accent)] transition"
+          >
+            {t("home.skillMgmt")}
+          </Link>
+          <LanguageSwitcher />
         </div>
       </div>
 
       {/* 卡片墙 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {data.agents.map((agent) => (
-          <AgentCard key={agent.id} agent={agent} gatewayPort={data.gateway?.port || 18789} gatewayToken={data.gateway?.token} />
+          <AgentCard key={agent.id} agent={agent} gatewayPort={data.gateway?.port || 18789} gatewayToken={data.gateway?.token} t={t} />
         ))}
       </div>
 
@@ -439,7 +449,7 @@ export default function Home() {
       {allStats && (
         <div className="mt-8 p-5 rounded-xl border border-[var(--border)] bg-[var(--card)]">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-[var(--text)]">📊 全局统计趋势</h2>
+            <h2 className="text-sm font-semibold text-[var(--text)]">{t("home.globalTrend")}</h2>
             <div className="flex rounded-lg border border-[var(--border)] overflow-hidden">
               {(Object.keys(RANGE_LABELS) as TimeRange[]).map((r) => (
                 <button key={r} onClick={() => setStatsRange(r)}
@@ -457,21 +467,21 @@ export default function Home() {
               <>
                 <div className="grid grid-cols-3 gap-3 mb-4">
                   <div className="p-3 rounded-lg bg-[var(--bg)] border border-[var(--border)]">
-                    <div className="text-[10px] text-[var(--text-muted)]">总 Input Token</div>
+                    <div className="text-[10px] text-[var(--text-muted)]">{t("home.totalInputToken")}</div>
                     <div className="text-lg font-bold text-blue-400">{formatTokens(totalInput)}</div>
                   </div>
                   <div className="p-3 rounded-lg bg-[var(--bg)] border border-[var(--border)]">
-                    <div className="text-[10px] text-[var(--text-muted)]">总 Output Token</div>
+                    <div className="text-[10px] text-[var(--text-muted)]">{t("home.totalOutputToken")}</div>
                     <div className="text-lg font-bold text-emerald-400">{formatTokens(totalOutput)}</div>
                   </div>
                   <div className="p-3 rounded-lg bg-[var(--bg)] border border-[var(--border)]">
-                    <div className="text-[10px] text-[var(--text-muted)]">总消息数</div>
+                    <div className="text-[10px] text-[var(--text-muted)]">{t("home.totalMessages")}</div>
                     <div className="text-lg font-bold text-purple-400">{totalMsgs}</div>
                   </div>
                 </div>
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-[var(--text-muted)]">🔢 Token 消耗趋势</span>
+                    <span className="text-xs text-[var(--text-muted)]">{t("home.tokenTrend")}</span>
                     <div className="flex items-center gap-3 text-[10px]">
                       <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" /> Input</span>
                       <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Output</span>
@@ -480,12 +490,12 @@ export default function Home() {
                   <TrendChart data={currentData} lines={[
                     { key: "inputTokens", color: "#3b82f6", label: "Input" },
                     { key: "outputTokens", color: "#10b981", label: "Output" },
-                  ]} />
+                  ]} t={t} />
                 </div>
                 {statsRange === "daily" && (
                   <div>
-                    <span className="text-xs text-[var(--text-muted)]">⏱️ 平均响应时间趋势</span>
-                    <ResponseTrendChart data={currentData} />
+                    <span className="text-xs text-[var(--text-muted)]">{t("home.avgResponseTrend")}</span>
+                    <ResponseTrendChart data={currentData} t={t} />
                   </div>
                 )}
               </>
@@ -498,7 +508,7 @@ export default function Home() {
       {data.groupChats && data.groupChats.length > 0 && (
         <div className="mt-8 p-4 rounded-xl border border-[var(--border)] bg-[var(--card)]">
           <h2 className="text-sm font-semibold text-[var(--text-muted)] mb-3">
-            💬 群聊拓扑
+            {t("home.groupTopology")}
           </h2>
           <div className="space-y-3">
             {data.groupChats.map((group, i) => (
@@ -506,7 +516,7 @@ export default function Home() {
                 <span className="text-lg">{group.channel === "feishu" ? "📱" : "🎮"}</span>
                 <div className="flex-1">
                   <div className="text-xs text-[var(--text-muted)] mb-1">
-                    {group.channel === "feishu" ? "飞书群" : "Discord 频道"} · {group.groupId.split(":")[1]}
+                    {group.channel === "feishu" ? t("home.feishuGroup") : t("home.discordChannel")} · {group.groupId.split(":")[1]}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {group.agents.map((a) => (
@@ -516,7 +526,7 @@ export default function Home() {
                     ))}
                   </div>
                 </div>
-                <span className="text-xs text-[var(--text-muted)]">{group.agents.length} 个机器人</span>
+                <span className="text-xs text-[var(--text-muted)]">{group.agents.length} {t("home.bots")}</span>
               </div>
             ))}
           </div>
@@ -527,7 +537,7 @@ export default function Home() {
       {data.defaults.fallbacks.length > 0 && (
         <div className="mt-8 p-4 rounded-xl border border-[var(--border)] bg-[var(--card)]">
           <h2 className="text-sm font-semibold text-[var(--text-muted)] mb-2">
-            🔄 Fallback 模型
+            {t("home.fallbackModels")}
           </h2>
           <div className="flex flex-wrap gap-2">
             {data.defaults.fallbacks.map((f, i) => (
