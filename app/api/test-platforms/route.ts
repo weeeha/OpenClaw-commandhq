@@ -242,12 +242,17 @@ async function testDiscord(
 }
 
 // Agent session test: use openclaw CLI to send a health check via feishu DM session
-function testAgentSession(agentId: string, sessionKey?: string): AgentTestResult {
+function testAgentSession(agentId: string, sessionKey?: string, platform?: string, replyAccount?: string, replyTo?: string): AgentTestResult {
   const startTime = Date.now();
   try {
-    const sessionArg = sessionKey ? `--session-id "${sessionKey}"` : "";
-    const result = execSync(
-      `openclaw agent --agent ${agentId} ${sessionArg} --message "Health check: reply with OK" --json --timeout 30`,
+    const args = [`openclaw`, `agent`, `--agent`, agentId, `--message`, `Health check: reply with OK`, `--json`, `--timeout`, `30`];
+    if (sessionKey) args.push(`--session-id`, sessionKey);
+    if (platform) {
+      args.push(`--deliver`, `--channel`, platform);
+      if (replyAccount) args.push(`--reply-account`, replyAccount);
+      if (replyTo) args.push(`--reply-to`, replyTo);
+    }
+    const result = execSync(args.join(" "),
       { timeout: 40000, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }
     );
 
@@ -350,10 +355,22 @@ export async function POST() {
     // Phase 2: Agent session tests via feishu DM session (sequential)
     const agentResults: PlatformTestResult[] = [];
     for (const id of agentIds) {
-      // Build feishu DM session key for this agent
+      // Build feishu DM session key and delivery params
       const dmUser = getFeishuDmUser(id);
       const sessionKey = dmUser ? `agent:${id}:feishu:direct:${dmUser}` : undefined;
-      const r = testAgentSession(id, sessionKey);
+      // Find the feishu account id for this agent
+      const feishuBinding = bindings.find(
+        (b: any) => b.agentId === id && b.match?.channel === "feishu"
+      );
+      const accountId = feishuBinding?.match?.accountId || id;
+      const hasFeishu = !!(feishuAccounts[accountId] || (id === "main" && feishuConfig.enabled));
+      const r = testAgentSession(
+        id,
+        sessionKey,
+        hasFeishu && dmUser ? "feishu" : undefined,
+        hasFeishu && dmUser ? accountId : undefined,
+        dmUser || undefined
+      );
       agentResults.push({
         agentId: r.agentId,
         platform: "agent",
