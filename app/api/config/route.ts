@@ -9,7 +9,7 @@ const OPENCLAW_DIR = OPENCLAW_HOME;
 
 // 从配置的 allowFrom 读取用户 id，用于构建 session key
 
-// 读取 agent 的 session 状态（最近活跃时间、token 用量）
+// 读取 agent 的 session 状态（最近活跃时间、token 用量）- 从 jsonl 文件解析
 interface SessionStatus {
   lastActive: number | null;
   totalTokens: number;
@@ -19,19 +19,51 @@ interface SessionStatus {
 
 function getAgentSessionStatus(agentId: string): SessionStatus {
   const result: SessionStatus = { lastActive: null, totalTokens: 0, contextTokens: 0, sessionCount: 0 };
+  const sessionsDir = path.join(OPENCLAW_DIR, `agents/${agentId}/sessions`);
+  
+  let files: string[];
   try {
-    const sessionsPath = path.join(OPENCLAW_DIR, `agents/${agentId}/sessions/sessions.json`);
-    const raw = fs.readFileSync(sessionsPath, "utf-8");
-    const sessions = JSON.parse(raw);
-    for (const [, val] of Object.entries(sessions)) {
-      const s = val as any;
-      result.sessionCount++;
-      result.totalTokens += s.totalTokens || 0;
-      if (s.contextTokens && s.contextTokens > result.contextTokens) result.contextTokens = s.contextTokens;
-      const updatedAt = s.updatedAt || 0;
-      if (!result.lastActive || updatedAt > result.lastActive) result.lastActive = updatedAt;
+    files = fs.readdirSync(sessionsDir).filter(f => f.endsWith(".jsonl") && !f.includes(".deleted."));
+  } catch { return result; }
+
+  // 使用 Set 来统计唯一的 session
+  const sessionKeys = new Set<string>();
+
+  for (const file of files) {
+    const filePath = path.join(sessionsDir, file);
+    let content: string;
+    try { content = fs.readFileSync(filePath, "utf-8"); } catch { continue; }
+
+    const lines = content.trim().split("\n");
+    
+    for (const line of lines) {
+      let entry: any;
+      try { entry = JSON.parse(line); } catch { continue; }
+      
+      // 统计 session 数量（从 session key 或 message 中的 sessionKey）
+      if (entry.sessionKey) {
+        sessionKeys.add(entry.sessionKey);
+      }
+      
+      // 解析 token 用量 - 从 assistant 消息的 usage 中获取
+      if (entry.type === "message" && entry.message) {
+        const msg = entry.message;
+        if (msg.role === "assistant" && msg.usage) {
+          result.totalTokens += msg.usage.input || 0;
+          result.totalTokens += msg.usage.output || 0;
+        }
+        // 更新最近活跃时间
+        if (entry.timestamp) {
+          const ts = new Date(entry.timestamp).getTime();
+          if (!result.lastActive || ts > result.lastActive) {
+            result.lastActive = ts;
+          }
+        }
+      }
     }
-  } catch {}
+  }
+  
+  result.sessionCount = sessionKeys.size || files.length; // 降级为文件数
   return result;
 }
 
