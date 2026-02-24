@@ -4,7 +4,9 @@ A lightweight web dashboard for viewing all your [OpenClaw](https://github.com/o
 
 ## Background
 
-When running multiple OpenClaw agents across different platforms (Feishu, Discord, etc.), it becomes hard to track which bot uses which model. This dashboard reads your `openclaw.json` config and displays Bots/Agents/Models/Sessions status in a clean UI.
+When running multiple OpenClaw agents across different platforms (Feishu, Discord, etc.), managing and monitoring them becomes increasingly complex — which bot uses which model? Are the platforms connected? Is the gateway healthy? How are tokens being consumed?
+
+This dashboard reads your local OpenClaw configuration and session data, providing a unified web UI to monitor and test all your agents, models, platforms, and sessions in real time. No database required — everything is derived directly from `~/.openclaw/openclaw.json` and local session files.
 
 ## Features
 
