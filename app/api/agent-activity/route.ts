@@ -130,9 +130,9 @@ export async function GET() {
 
           let state: 'idle' | 'working' | 'waiting' | 'offline'
           const timeDiff = now - lastActive
-          if (lastActive === 0 || timeDiff > 5 * 60 * 1000) {
+          if (lastActive === 0 || timeDiff > 10 * 60 * 1000) {
             state = 'offline'
-          } else if (timeDiff <= 30 * 1000) {
+          } else if (timeDiff <= 2 * 60 * 1000) {
             state = 'working'
           } else {
             state = 'idle'
