@@ -245,6 +245,31 @@ export const PC_SPRITE: SpriteData = (() => {
   ]
 })()
 
+/** PC monitor back: 16x16 — top-down monitor viewed from behind */
+export const PC_BACK_SPRITE: SpriteData = (() => {
+  const F = '#555555'
+  const K = '#4A4A4A' // back panel
+  const D = '#444444'
+  return [
+    [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
+    [_, _, _, _, _, D, D, D, D, D, D, _, _, _, _, _],
+    [_, _, _, _, _, D, D, D, D, D, D, _, _, _, _, _],
+    [_, _, _, _, _, _, D, D, D, D, _, _, _, _, _, _],
+    [_, _, _, _, _, _, _, D, D, _, _, _, _, _, _, _],
+    [_, _, _, _, _, _, _, D, D, _, _, _, _, _, _, _],
+    [_, _, _, F, F, F, F, F, F, F, F, F, F, _, _, _],
+    [_, _, _, F, K, K, K, K, K, K, K, K, F, _, _, _],
+    [_, _, _, F, K, K, K, K, K, K, K, K, F, _, _, _],
+    [_, _, _, F, K, K, K, K, K, K, K, K, F, _, _, _],
+    [_, _, _, F, K, K, K, K, K, K, K, K, F, _, _, _],
+    [_, _, _, F, K, K, K, K, K, K, K, K, F, _, _, _],
+    [_, _, _, F, K, K, K, K, K, K, K, K, F, _, _, _],
+    [_, _, _, F, K, K, K, K, K, K, K, K, F, _, _, _],
+    [_, _, _, F, F, F, F, F, F, F, F, F, F, _, _, _],
+    [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
+  ]
+})()
+
 /** Desk lamp: 16x16 — top-down lamp with light cone */
 export const LAMP_SPRITE: SpriteData = (() => {
   const Y = '#FFDD55'

@@ -275,11 +275,13 @@ export function createDefaultLayout(): OfficeLayout {
   }
 
   const furniture: PlacedFurniture[] = [
-    // ── Left work room — 4 horizontal desks in 2×2 grid, each with a chair ──
+    // ── Left work room — 4 horizontal desks in 2×2 grid ──
+    // Top row: benches above desks, PCs show back
     { uid: 'desk-l1', type: FurnitureType.TABLE_WOOD_SM_HORIZONTAL, col: 3, row: 3 },
-    { uid: 'chair-l1', type: FurnitureType.BENCH, col: 3.5, row: 4 },
+    { uid: 'chair-l1', type: FurnitureType.BENCH, col: 3.5, row: 2 },
     { uid: 'desk-l2', type: FurnitureType.TABLE_WOOD_SM_HORIZONTAL, col: 6, row: 3 },
-    { uid: 'chair-l2', type: FurnitureType.BENCH, col: 6.5, row: 4 },
+    { uid: 'chair-l2', type: FurnitureType.BENCH, col: 6.5, row: 2 },
+    // Bottom row: benches below desks, PCs show front
     { uid: 'desk-l3', type: FurnitureType.TABLE_WOOD_SM_HORIZONTAL, col: 3, row: 6 },
     { uid: 'chair-l3', type: FurnitureType.BENCH, col: 3.5, row: 7 },
     { uid: 'desk-l4', type: FurnitureType.TABLE_WOOD_SM_HORIZONTAL, col: 6, row: 6 },
@@ -288,8 +290,8 @@ export function createDefaultLayout(): OfficeLayout {
     { uid: 'plant-l1', type: FurnitureType.PLANT, col: 1, row: 1 },
     { uid: 'plant-l2', type: FurnitureType.PLANT_SMALL, col: 9, row: 1 },
     { uid: 'lamp-l', type: FurnitureType.LAMP, col: 1, row: 3 },
-    { uid: 'pc-l1', type: FurnitureType.PC, col: 3.5, row: 3 },
-    { uid: 'pc-l2', type: FurnitureType.PC, col: 6.5, row: 3 },
+    { uid: 'pc-l1', type: FurnitureType.PC_BACK, col: 3.5, row: 3 },
+    { uid: 'pc-l2', type: FurnitureType.PC_BACK, col: 6.5, row: 3 },
     { uid: 'pc-l3', type: FurnitureType.PC, col: 3.5, row: 6 },
     { uid: 'pc-l4', type: FurnitureType.PC, col: 6.5, row: 6 },
 

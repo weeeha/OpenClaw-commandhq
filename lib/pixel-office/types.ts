@@ -88,6 +88,7 @@ export const FurnitureType = {
   WHITEBOARD: 'whiteboard',
   CHAIR: 'chair',
   PC: 'pc',
+  PC_BACK: 'pc_back',
   LAMP: 'lamp',
   // Tileset — Desks
   TABLE_WOOD_SM_VERTICAL: 'ts_table_wood_sm_vertical',
