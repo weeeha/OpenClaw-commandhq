@@ -130,6 +130,7 @@ export default function PixelOfficePage() {
   const [editorTick, setEditorTick] = useState(0)
   const [officeReady, setOfficeReady] = useState(false)
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
+  const [fullscreenPhoto, setFullscreenPhoto] = useState(false)
 
   const forceEditorUpdate = useCallback(() => setEditorTick(t => t + 1), [])
 
@@ -487,7 +488,8 @@ export default function PixelOfficePage() {
         return tileX >= f.col && tileX < f.col + entry.footprintW &&
                tileY >= f.row && tileY < f.row + entry.footprintH
       })
-      if (canvasRef.current) canvasRef.current.style.cursor = (onCamera || id !== null) ? 'pointer' : 'default'
+      const onPhoto = photographRef.current && tileX >= 10 && tileX < 17 && tileY >= -0.5 && tileY < 1
+      if (canvasRef.current) canvasRef.current.style.cursor = (onCamera || id !== null || onPhoto) ? 'pointer' : 'default'
     }
   }
 
@@ -515,6 +517,9 @@ export default function PixelOfficePage() {
           const img = new Image()
           img.src = `/assets/pixel-office/my-photographic-works/${idx}.webp`
           img.onload = () => { photographRef.current = img }
+        } else if (photographRef.current && tileX >= 10 && tileX < 17 && tileY >= -0.5 && tileY < 1) {
+          // Click on wall photograph — fullscreen view
+          setFullscreenPhoto(true)
         } else {
           // Check character click
           const charId = office.getCharacterAt(worldX, worldY)
@@ -891,6 +896,14 @@ export default function PixelOfficePage() {
             </div>
           )
         })()}
+
+        {/* Fullscreen photograph viewer */}
+        {fullscreenPhoto && photographRef.current && (
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80 cursor-pointer" onClick={() => setFullscreenPhoto(false)}>
+            <img src={photographRef.current.src} alt="photograph" className="max-w-[90%] max-h-[90%] object-contain rounded-lg shadow-2xl" />
+            <button onClick={() => setFullscreenPhoto(false)} className="absolute top-4 right-4 text-white/70 hover:text-white text-2xl leading-none">×</button>
+          </div>
+        )}
 
         {/* Editor overlays */}
         {isEditMode && (
