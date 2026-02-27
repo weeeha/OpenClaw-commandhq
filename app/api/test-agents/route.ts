@@ -1,83 +1,60 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { execFile } from "child_process";
+import { promisify } from "util";
 
+const execFileAsync = promisify(execFile);
 const OPENCLAW_HOME = process.env.OPENCLAW_HOME || path.join(process.env.HOME || "", ".openclaw");
 const CONFIG_PATH = path.join(OPENCLAW_HOME, "openclaw.json");
 
-// Resolve the model string (e.g. "yunyi-claude/claude-opus-4-6") to provider + modelId
-function resolveModel(config: any, modelStr: string) {
-  const [providerId, ...rest] = modelStr.split("/");
-  const modelId = rest.join("/");
-  const provider = config.models?.providers?.[providerId];
-  return { providerId, modelId, provider };
+interface ProbeResult {
+  provider?: string;
+  model?: string;
+  mode?: "api_key" | "oauth" | string;
+  status?: "ok" | "error" | "unknown" | string;
+  error?: string;
+  latencyMs?: number;
 }
 
-async function testModel(provider: any, modelId: string): Promise<{ ok: boolean; text?: string; error?: string; elapsed: number }> {
-  const baseUrl = provider.baseUrl;
-  const apiKey = provider.apiKey || "";
-  const api = provider.api;
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  const startTime = Date.now();
+function parseModelRef(modelStr: string) {
+  const [providerId, ...rest] = modelStr.split("/");
+  return { providerId, modelId: rest.join("/") };
+}
 
-  try {
-    if (api === "anthropic-messages") {
-      const authHeader = provider.authHeader || "x-api-key";
-      headers[authHeader] = apiKey;
-      headers["anthropic-version"] = "2023-06-01";
-      if (provider.headers) Object.assign(headers, provider.headers);
-
-      const body = {
-        model: modelId,
-        max_tokens: 32,
-        messages: [{ role: "user", content: "Say hi in 3 words." }],
-      };
-
-      const resp = await fetch(`${baseUrl}/v1/messages`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(100000),
-      });
-
-      const elapsed = Date.now() - startTime;
-      const data = await resp.json();
-
-      if (!resp.ok) {
-        return { ok: false, error: data.error?.message || JSON.stringify(data), elapsed };
+function parseJsonFromMixedOutput(output: string): any {
+  for (let i = 0; i < output.length; i++) {
+    if (output[i] !== "{") continue;
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let j = i; j < output.length; j++) {
+      const ch = output[j];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (ch === "\\") escaped = true;
+        else if (ch === "\"") inString = false;
+        continue;
       }
-      return { ok: true, text: data.content?.[0]?.text || "", elapsed };
-
-    } else if (api === "openai-completions") {
-      headers["Authorization"] = `Bearer ${apiKey}`;
-
-      const body = {
-        model: modelId,
-        max_tokens: 32,
-        messages: [{ role: "user", content: "Say hi in 3 words." }],
-      };
-
-      const resp = await fetch(`${baseUrl}/chat/completions`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(100000),
-      });
-
-      const elapsed = Date.now() - startTime;
-      const data = await resp.json();
-
-      if (!resp.ok) {
-        return { ok: false, error: data.error?.message || JSON.stringify(data), elapsed };
+      if (ch === "\"") {
+        inString = true;
+        continue;
       }
-      return { ok: true, text: data.choices?.[0]?.message?.content || "", elapsed };
-
-    } else {
-      return { ok: false, error: `Unknown API type: ${api}`, elapsed: Date.now() - startTime };
+      if (ch === "{") depth++;
+      else if (ch === "}") {
+        depth--;
+        if (depth === 0) {
+          const candidate = output.slice(i, j + 1).trim();
+          try {
+            const parsed = JSON.parse(candidate);
+            if (parsed && typeof parsed === "object") return parsed;
+          } catch {}
+          break;
+        }
+      }
     }
-  } catch (err: any) {
-    return { ok: false, error: err.message, elapsed: Date.now() - startTime };
   }
+  throw new Error("Failed to parse JSON output from openclaw models status --probe --json");
 }
 
 export async function POST() {
@@ -90,7 +67,6 @@ export async function POST() {
       ? defaults.model
       : defaults.model?.primary || "unknown";
 
-    // Discover agents
     let agentList = config.agents?.list || [];
     if (agentList.length === 0) {
       try {
@@ -100,35 +76,50 @@ export async function POST() {
           .filter((d: any) => d.isDirectory() && !d.name.startsWith("."))
           .map((d: any) => ({ id: d.name }));
       } catch {}
-      if (agentList.length === 0) {
-        agentList = [{ id: "main" }];
-      }
+      if (agentList.length === 0) agentList = [{ id: "main" }];
     }
 
-    // Test each agent's model in parallel
-    const results = await Promise.all(
-      agentList.map(async (agent: any) => {
-        const modelStr = agent.model || defaultModel;
-        const { providerId, modelId, provider } = resolveModel(config, modelStr);
+    const { stdout, stderr } = await execFileAsync(
+      "openclaw",
+      ["models", "status", "--probe", "--json"],
+      {
+        maxBuffer: 10 * 1024 * 1024,
+        env: { ...process.env, FORCE_COLOR: "0" },
+      }
+    );
+    const parsed = parseJsonFromMixedOutput(`${stdout}\n${stderr || ""}`);
+    const probes: ProbeResult[] = parsed?.auth?.probes?.results || [];
 
-        if (!provider) {
-          return {
-            agentId: agent.id,
-            model: modelStr,
-            ok: false,
-            error: `Provider "${providerId}" not found`,
-            elapsed: 0,
-          };
-        }
+    const results = agentList.map((agent: any) => {
+      const modelStr = agent.model || defaultModel;
+      const { providerId, modelId } = parseModelRef(modelStr);
+      const fullModel = `${providerId}/${modelId}`;
 
-        const result = await testModel(provider, modelId);
+      const exact =
+        probes.find((p) => p.provider === providerId && p.model === fullModel) ||
+        probes.find((p) => p.provider === providerId && typeof p.model === "string" && p.model.endsWith(`/${modelId}`));
+      const matched = exact || probes.find((p) => p.provider === providerId);
+
+      if (!matched) {
         return {
           agentId: agent.id,
           model: modelStr,
-          ...result,
+          ok: false,
+          error: `No probe result for provider ${providerId}`,
+          elapsed: 0,
         };
-      })
-    );
+      }
+
+      const ok = matched.status === "ok";
+      return {
+        agentId: agent.id,
+        model: modelStr,
+        ok,
+        text: ok ? "OK (openclaw models status --probe)" : undefined,
+        error: ok ? undefined : (matched.error || `Probe status: ${matched.status || "unknown"}`),
+        elapsed: matched.latencyMs || 0,
+      };
+    });
 
     return NextResponse.json({ results });
   } catch (err: any) {
