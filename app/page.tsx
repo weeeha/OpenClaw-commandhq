@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useI18n } from "@/lib/i18n";
+import { buildGatewayUrl } from "@/lib/gateway-url";
 import { GatewayStatus } from "./gateway-status";
 
 interface Platform {
@@ -186,8 +187,8 @@ function PlatformBadge({ platform, agentId, gatewayPort, gatewayToken, t, testRe
   } else {
     sessionKey = `agent:${agentId}:main`;
   }
-  let sessionUrl = `http://localhost:${gatewayPort}/chat?session=${encodeURIComponent(sessionKey)}`;
-  if (gatewayToken) sessionUrl += `&token=${encodeURIComponent(gatewayToken)}`;
+  let sessionUrl = buildGatewayUrl(gatewayPort, "/chat", { session: sessionKey });
+  if (gatewayToken) sessionUrl = buildGatewayUrl(gatewayPort, "/chat", { session: sessionKey, token: gatewayToken });
 
   const badgeStyle = pName === "feishu"
     ? "bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/40 hover:border-blue-400"
@@ -321,8 +322,8 @@ function AgentStatusBadge({ state, t }: { state?: string; t: TFunc }) {
 // Agent 卡片
 function AgentCard({ agent, gatewayPort, gatewayToken, t, testResult, platformTestResults, sessionTestResult, agentState, dmSessionResults, providerAccessModeMap }: { agent: Agent; gatewayPort: number; gatewayToken?: string; t: TFunc; testResult?: { ok: boolean; text?: string; error?: string; elapsed: number } | null; platformTestResults?: Record<string, PlatformTestResult | null>; sessionTestResult?: { ok: boolean; reply?: string; error?: string; elapsed: number } | null; agentState?: string; dmSessionResults?: Record<string, PlatformTestResult | null>; providerAccessModeMap?: Record<string, "auth" | "api_key"> }) {
   const sessionKey = `agent:${agent.id}:main`;
-  let sessionUrl = `http://localhost:${gatewayPort}/chat?session=${encodeURIComponent(sessionKey)}`;
-  if (gatewayToken) sessionUrl += `&token=${encodeURIComponent(gatewayToken)}`;
+  let sessionUrl = buildGatewayUrl(gatewayPort, "/chat", { session: sessionKey });
+  if (gatewayToken) sessionUrl = buildGatewayUrl(gatewayPort, "/chat", { session: sessionKey, token: gatewayToken });
   const modelProvider = agent.model.includes("/") ? agent.model.split("/", 1)[0] : "default";
   const modelAccessMode = providerAccessModeMap?.[modelProvider];
 

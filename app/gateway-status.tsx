@@ -3,6 +3,15 @@
 import { useEffect, useState, useCallback } from "react";
 import { useI18n } from "@/lib/i18n";
 
+function resolveGatewayUrl(url?: string): string | undefined {
+  if (!url || typeof window === "undefined") return url;
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === "localhost") parsed.hostname = window.location.hostname;
+    return parsed.toString();
+  } catch { return url; }
+}
+
 interface HealthResult {
   ok: boolean;
   error?: string;
@@ -31,7 +40,7 @@ export function GatewayStatus() {
   return (
     <div className="relative inline-flex items-center gap-2">
       <a
-        href={health?.ok && health.webUrl ? health.webUrl : undefined}
+        href={health?.ok && health.webUrl ? resolveGatewayUrl(health.webUrl) : undefined}
         target="_blank"
         rel="noopener noreferrer"
         className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-cyan-500/20 text-cyan-300 border-cyan-500/30 hover:bg-cyan-500/30 transition-colors cursor-pointer"

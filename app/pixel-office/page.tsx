@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { OfficeState } from '@/lib/pixel-office/engine/officeState'
 import { renderFrame } from '@/lib/pixel-office/engine/renderer'
+import { buildGatewayUrl } from "@/lib/gateway-url"
 import type { EditorRenderState } from '@/lib/pixel-office/engine/renderer'
 import type { ContributionData } from '@/lib/pixel-office/engine/renderer'
 import { syncAgentsToOffice, AgentActivity } from '@/lib/pixel-office/agentBridge'
@@ -647,8 +648,8 @@ export default function PixelOfficePage() {
           // Click on PC — open gateway chat for main agent
           const gw = gatewayRef.current
           const sessionKey = 'agent:main:main'
-          let chatUrl = `http://localhost:${gw.port}/chat?session=${encodeURIComponent(sessionKey)}`
-          if (gw.token) chatUrl += `&token=${encodeURIComponent(gw.token)}`
+          let chatUrl = buildGatewayUrl(gw.port, '/chat', { session: sessionKey })
+          if (gw.token) chatUrl = buildGatewayUrl(gw.port, '/chat', { session: sessionKey, token: gw.token })
           window.open(chatUrl, '_blank')
         } else if (office.layout.furniture.some(f => {
           if (f.uid !== 'library-r') return false

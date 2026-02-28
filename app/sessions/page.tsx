@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { buildGatewayUrl } from "@/lib/gateway-url";
 import { useI18n } from "@/lib/i18n";
 
 interface AgentInfo {
@@ -288,8 +289,8 @@ function SessionList({ agentId }: { agentId: string }) {
       <div className="space-y-3">
         {sessions.map((s) => {
           const typeInfo = getTypeLabel(s.type);
-          let chatUrl = `http://localhost:${gateway.port}/chat?session=${encodeURIComponent(s.key)}`;
-          if (gateway.token) chatUrl += `&token=${encodeURIComponent(gateway.token)}`;
+          let chatUrl = buildGatewayUrl(gateway.port, "/chat", { session: s.key });
+          if (gateway.token) chatUrl = buildGatewayUrl(gateway.port, "/chat", { session: s.key, token: gateway.token });
           return (
             <div
               key={s.key}
