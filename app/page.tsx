@@ -64,6 +64,13 @@ type TimeRange = "daily" | "weekly" | "monthly";
 
 type TFunc = (key: string) => string;
 
+let cachedHomeData: ConfigData | null = null;
+let cachedHomeError: string | null = null;
+let cachedHomeAllStats: AllStats | null = null;
+let cachedHomeLastUpdated = "";
+let cachedHomeRefreshInterval = 0;
+let cachedHomeAgentStates: Record<string, string> = {};
+
 function formatTokens(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
   if (n >= 1_000) return (n / 1_000).toFixed(1) + "k";
@@ -488,12 +495,12 @@ function AgentCard({ agent, gatewayPort, gatewayToken, t, testResult, platformTe
 
 export default function Home() {
   const { t } = useI18n();
-  const [data, setData] = useState<ConfigData | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshInterval, setRefreshInterval] = useState(0);
-  const [lastUpdated, setLastUpdated] = useState<string>("");
+  const [data, setData] = useState<ConfigData | null>(cachedHomeData);
+  const [error, setError] = useState<string | null>(cachedHomeError);
+  const [refreshInterval, setRefreshInterval] = useState(cachedHomeRefreshInterval);
+  const [lastUpdated, setLastUpdated] = useState<string>(cachedHomeLastUpdated);
   const [loading, setLoading] = useState(false);
-  const [allStats, setAllStats] = useState<AllStats | null>(null);
+  const [allStats, setAllStats] = useState<AllStats | null>(cachedHomeAllStats);
   const [statsRange, setStatsRange] = useState<TimeRange>("daily");
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [testResults, setTestResults] = useState<Record<string, { ok: boolean; text?: string; error?: string; elapsed: number }> | null>(null);
@@ -504,7 +511,7 @@ export default function Home() {
   const [testingSessions, setTestingSessions] = useState(false);
   const [dmSessionResults, setDmSessionResults] = useState<Record<string, PlatformTestResult | null> | null>(null);
   const [testingDmSessions, setTestingDmSessions] = useState(false);
-  const [agentStates, setAgentStates] = useState<Record<string, string>>({});
+  const [agentStates, setAgentStates] = useState<Record<string, string>>(cachedHomeAgentStates);
 
   const RANGE_LABELS: Record<TimeRange, string> = { daily: t("range.daily"), weekly: t("range.weekly"), monthly: t("range.monthly") };
 
@@ -517,25 +524,42 @@ export default function Home() {
     { label: t("refresh.10m"), value: 600 },
   ];
 
-  const fetchData = useCallback(() => {
-    setLoading(true);
+  const fetchData = useCallback((silent = false) => {
+    if (!silent) setLoading(true);
     Promise.all([
       fetch("/api/config").then((r) => r.json()),
       fetch("/api/stats-all").then((r) => r.json()),
     ])
       .then(([configData, statsData]) => {
-        if (configData.error) setError(configData.error);
-        else { setData(configData); setError(null); }
-        if (!statsData.error) setAllStats(statsData);
-        setLastUpdated(new Date().toLocaleTimeString("zh-CN"));
+        if (configData.error) {
+          setError(configData.error);
+          cachedHomeError = configData.error;
+        } else {
+          setData(configData);
+          setError(null);
+          cachedHomeData = configData;
+          cachedHomeError = null;
+        }
+        if (!statsData.error) {
+          setAllStats(statsData);
+          cachedHomeAllStats = statsData;
+        }
+        const updated = new Date().toLocaleTimeString("zh-CN");
+        setLastUpdated(updated);
+        cachedHomeLastUpdated = updated;
       })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+      .catch((e) => {
+        setError(e.message);
+        cachedHomeError = e.message;
+      })
+      .finally(() => {
+        if (!silent) setLoading(false);
+      });
   }, []);
 
   // 首次加载 - 从 localStorage 恢复测试状态
   useEffect(() => {
-    fetchData();
+    fetchData(!!cachedHomeData);
     const savedTestResults = localStorage.getItem('agentTestResults');
     if (savedTestResults) {
       try {
@@ -569,6 +593,10 @@ export default function Home() {
       }
     }
   }, [fetchData]);
+
+  useEffect(() => {
+    cachedHomeRefreshInterval = refreshInterval;
+  }, [refreshInterval]);
 
   // 保存测试结果到 localStorage
   useEffect(() => {
@@ -700,6 +728,7 @@ export default function Home() {
             const map: Record<string, string> = {};
             for (const s of d.statuses) map[s.agentId] = s.state;
             setAgentStates(map);
+            cachedHomeAgentStates = map;
           }
         })
         .catch(() => {});
@@ -790,7 +819,7 @@ export default function Home() {
           </select>
           {refreshInterval === 0 && (
             <button
-              onClick={fetchData}
+              onClick={() => fetchData(false)}
               disabled={loading}
               className="px-3 py-2 rounded-lg bg-[var(--card)] border border-[var(--border)] text-sm hover:border-[var(--accent)] transition disabled:opacity-50"
             >

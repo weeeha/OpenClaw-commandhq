@@ -108,21 +108,32 @@ function getGhostBorderDirection(col: number, row: number, cols: number, rows: n
 
 const FIXED_CANVAS_ZOOM = 2.5
 
+let cachedOfficeState: OfficeState | null = null
+let cachedEditorState: EditorState | null = null
+let cachedSavedLayout: OfficeLayout | null = null
+let cachedPan: { x: number; y: number } = { x: 0, y: 0 }
+let cachedIsEditMode = false
+let spriteAssetsPromise: Promise<void> | null = null
+let cachedAgents: AgentActivity[] = []
+let cachedAgentIdMap = new Map<string, number>()
+let cachedNextCharacterId = 1
+let cachedPrevAgentStates = new Map<string, string>()
+
 export default function PixelOfficePage() {
   const { t } = useI18n()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const officeRef = useRef<OfficeState | null>(null)
-  const editorRef = useRef<EditorState>(new EditorState())
-  const agentIdMapRef = useRef<Map<string, number>>(new Map())
-  const nextIdRef = useRef<{ current: number }>({ current: 1 })
+  const editorRef = useRef<EditorState>(cachedEditorState ?? new EditorState())
+  const agentIdMapRef = useRef<Map<string, number>>(new Map(cachedAgentIdMap))
+  const nextIdRef = useRef<{ current: number }>({ current: cachedNextCharacterId })
   const zoomRef = useRef<number>(FIXED_CANVAS_ZOOM)
-  const panRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
-  const savedLayoutRef = useRef<OfficeLayout | null>(null)
+  const panRef = useRef<{ x: number; y: number }>(cachedPan)
+  const savedLayoutRef = useRef<OfficeLayout | null>(cachedSavedLayout)
   const animationFrameIdRef = useRef<number | null>(null)
-  const prevAgentStatesRef = useRef<Map<string, string>>(new Map())
+  const prevAgentStatesRef = useRef<Map<string, string>>(new Map(cachedPrevAgentStates))
 
-  const [agents, setAgents] = useState<AgentActivity[]>([])
+  const [agents, setAgents] = useState<AgentActivity[]>(cachedAgents)
   const [hoveredAgentId, setHoveredAgentId] = useState<number | null>(null)
   const mousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
   const agentStatsRef = useRef<Map<string, { sessionCount: number; messageCount: number; totalTokens: number; todayAvgResponseMs: number; weeklyResponseMs: number[]; weeklyTokens: number[]; lastActive: number | null }>>(new Map())
@@ -130,7 +141,7 @@ export default function PixelOfficePage() {
   const photographRef = useRef<HTMLImageElement | null>(null)
   const gatewayRef = useRef<{ port: number; token?: string }>({ port: 18789 })
   const providersRef = useRef<Array<{ id: string; api: string; models: Array<{ id: string; name: string; contextWindow?: number }>; usedBy: Array<{ id: string; emoji: string; name: string }> }>>([])
-  const [isEditMode, setIsEditMode] = useState(false)
+  const [isEditMode, setIsEditMode] = useState(cachedIsEditMode)
   const [soundOn, setSoundOn] = useState(true)
   const [editorTick, setEditorTick] = useState(0)
   const [officeReady, setOfficeReady] = useState(false)
@@ -152,6 +163,19 @@ export default function PixelOfficePage() {
   // Load saved layout and sound preference
   useEffect(() => {
     const loadLayout = async () => {
+      if (cachedOfficeState) {
+        officeRef.current = cachedOfficeState
+        savedLayoutRef.current = cachedSavedLayout
+        editorRef.current = cachedEditorState ?? editorRef.current
+        panRef.current = cachedPan
+        setIsEditMode(cachedIsEditMode)
+        if (!spriteAssetsPromise) {
+          spriteAssetsPromise = Promise.all([loadCharacterPNGs(), loadWallPNG()]).then(() => undefined)
+        }
+        await spriteAssetsPromise
+        setOfficeReady(true)
+        return
+      }
       try {
         const res = await fetch('/api/pixel-office/layout')
         const data = await res.json()
@@ -164,7 +188,12 @@ export default function PixelOfficePage() {
       } catch {
         officeRef.current = new OfficeState()
       }
-      await Promise.all([loadCharacterPNGs(), loadWallPNG()])
+      cachedOfficeState = officeRef.current
+      cachedSavedLayout = savedLayoutRef.current
+      if (!spriteAssetsPromise) {
+        spriteAssetsPromise = Promise.all([loadCharacterPNGs(), loadWallPNG()]).then(() => undefined)
+      }
+      await spriteAssetsPromise
       setOfficeReady(true)
     }
     loadLayout()
@@ -177,11 +206,29 @@ export default function PixelOfficePage() {
     }
 
     return () => {
+      cachedOfficeState = officeRef.current
+      cachedEditorState = editorRef.current
+      cachedSavedLayout = savedLayoutRef.current
+      cachedPan = panRef.current
+      cachedIsEditMode = editorRef.current.isEditMode
       if (animationFrameIdRef.current !== null) {
         cancelAnimationFrame(animationFrameIdRef.current)
       }
     }
   }, [])
+
+  useEffect(() => {
+    cachedAgents = agents
+  }, [agents])
+
+  useEffect(() => {
+    cachedAgentIdMap = new Map(agentIdMapRef.current)
+    cachedNextCharacterId = nextIdRef.current.current
+  }, [agents])
+
+  useEffect(() => {
+    cachedPrevAgentStates = new Map(prevAgentStatesRef.current)
+  }, [agents])
 
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('openclaw-logo-drag-start'))
@@ -357,15 +404,24 @@ export default function PixelOfficePage() {
 
   // Poll for agent activity + sound notification
   useEffect(() => {
+    if (cachedAgents.length > 0) {
+      setAgents(cachedAgents)
+      if (officeRef.current) {
+        syncAgentsToOffice(cachedAgents, officeRef.current, agentIdMapRef.current, nextIdRef.current)
+      }
+    }
     const fetchAgents = async () => {
       try {
         const res = await fetch('/api/agent-activity')
         const data = await res.json()
         const newAgents: AgentActivity[] = data.agents || []
         setAgents(newAgents)
+        cachedAgents = newAgents
 
         if (officeRef.current) {
           syncAgentsToOffice(newAgents, officeRef.current, agentIdMapRef.current, nextIdRef.current)
+          cachedAgentIdMap = new Map(agentIdMapRef.current)
+          cachedNextCharacterId = nextIdRef.current.current
         }
 
         // Play sound when agent transitions to waiting
@@ -390,6 +446,7 @@ export default function PixelOfficePage() {
         const stateMap = new Map<string, string>()
         for (const a of newAgents) stateMap.set(a.agentId, a.state)
         prevAgentStatesRef.current = stateMap
+        cachedPrevAgentStates = new Map(stateMap)
       } catch (e) {
         console.error('Failed to fetch agents:', e)
       }
@@ -1046,6 +1103,13 @@ export default function PixelOfficePage() {
           onMouseDown={handleMouseDown} onMouseUp={handleMouseUp}
           onContextMenu={handleContextMenu}
           className="w-full h-full" />
+        {!officeReady && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#1a1a2e]/85 pointer-events-none">
+            <div className="px-4 py-2 rounded-lg border border-[var(--border)] bg-[var(--card)] text-sm text-[var(--text-muted)]">
+              像素办公室加载中...
+            </div>
+          </div>
+        )}
 
         {/* Broadcast notifications */}
         {broadcasts.length > 0 && (

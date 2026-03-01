@@ -100,8 +100,6 @@ export function Sidebar() {
     window.dispatchEvent(new CustomEvent("openclaw-bugs-config-change"));
   };
 
-  const isPixelOfficePage = pathname.startsWith("/pixel-office");
-
   return (
     <>
       <aside
@@ -116,7 +114,7 @@ export function Sidebar() {
                 <span
                   className="relative inline-block transition-opacity duration-300"
                   style={{
-                    fontSize: "3.375rem",
+                    fontSize: "4.219rem",
                     lineHeight: 1,
                     transform: `translate(${logoCarry.dx}px, ${logoCarry.dy}px) rotate(${logoCarry.angle}rad)`,
                     opacity: logoCarry.hidden ? 0 : 1,
@@ -140,7 +138,7 @@ export function Sidebar() {
                   <span
                     className="relative inline-block transition-opacity duration-300"
                     style={{
-                      fontSize: "3.375rem",
+                      fontSize: "4.219rem",
                       lineHeight: 1,
                       transform: `translate(${logoCarry.dx}px, ${logoCarry.dy}px) rotate(${logoCarry.angle}rad)`,
                       opacity: logoCarry.hidden ? 0 : 1,
@@ -207,7 +205,7 @@ export function Sidebar() {
                 </div>
               </div>
             ))}
-            {!collapsed && isPixelOfficePage && (
+            {!collapsed && (
               <div className="rounded-xl border border-[var(--border)] bg-[var(--card)]/65 p-1">
                 <button
                   onClick={() => setExperimentOpen((v) => !v)}
@@ -256,6 +254,15 @@ export function Sidebar() {
                   </div>
                 )}
               </div>
+            )}
+            {collapsed && (
+              <button
+                onClick={() => setCollapsed(false)}
+                title="实验功能"
+                className="w-full flex items-center justify-center rounded-lg px-2 py-2 text-base border border-[var(--border)] bg-[var(--card)]/65 text-[var(--text)] hover:bg-[var(--bg)] transition-colors"
+              >
+                🧪
+              </button>
             )}
           </div>
         </nav>
