@@ -200,6 +200,7 @@ function PlatformBadge({ platform, agentId, gatewayPort, gatewayToken, gatewayHo
     : pName === "whatsapp"
     ? "/assets/platform-logos/whatsapp.svg"
     : "/assets/platform-logos/discord.svg";
+  const logoSizeClass = pName === "feishu" ? "w-[1.09375rem] h-[1.09375rem]" : "w-3.5 h-3.5";
 
   let sessionKey: string;
   if (pName === "feishu" && platform.botOpenId) {
@@ -243,7 +244,7 @@ function PlatformBadge({ platform, agentId, gatewayPort, gatewayToken, gatewayHo
         <img
           src={remoteLogoSrc}
           alt={`${label} logo`}
-          className="w-3.5 h-3.5 shrink-0"
+          className={`${logoSizeClass} shrink-0`}
           onError={(e) => {
             if (e.currentTarget.dataset.fallbackApplied === "1") return;
             e.currentTarget.dataset.fallbackApplied = "1";
