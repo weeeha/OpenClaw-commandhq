@@ -5,6 +5,11 @@ import path from "path";
 const OPENCLAW_HOME = path.join(process.env.HOME || "/root", ".openclaw");
 const CONFIG_PATH = path.join(OPENCLAW_HOME, "openclaw.json");
 
+function hasEmbeddedHttpError(reply: string): boolean {
+  // Some providers return error text in content while gateway still returns HTTP 200.
+  return /\bHTTP\s*(4\d{2}|5\d{2})\b/i.test(reply);
+}
+
 export async function POST() {
   try {
     const raw = fs.readFileSync(CONFIG_PATH, "utf-8");
@@ -51,7 +56,13 @@ export async function POST() {
           results.push({ agentId, ok: false, error: data.error?.message || "API error", elapsed });
         } else {
           const reply = data.choices?.[0]?.message?.content || "";
-          results.push({ agentId, ok: true, reply: reply.slice(0, 200) || "(no reply)", elapsed });
+          const clippedReply = reply.slice(0, 200) || "(no reply)";
+          const embeddedHttpErr = hasEmbeddedHttpError(reply);
+          if (embeddedHttpErr) {
+            results.push({ agentId, ok: false, error: clippedReply, elapsed });
+          } else {
+            results.push({ agentId, ok: true, reply: clippedReply, elapsed });
+          }
         }
       } catch (err: any) {
         const elapsed = Date.now() - startTime;
@@ -68,4 +79,8 @@ export async function POST() {
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
+}
+
+export async function GET() {
+  return POST();
 }
