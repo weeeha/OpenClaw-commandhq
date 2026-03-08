@@ -10,27 +10,216 @@ const BUGS_ENABLED_KEY = "pixel-office-bugs-enabled";
 const BUGS_COUNT_KEY = "pixel-office-bugs-count";
 const BUGS_MAX = 400;
 
-const NAV_ITEMS = [
+type NavIconName = "agents" | "pixelOffice" | "models" | "sessions" | "stats" | "alerts" | "skills";
+type PixelTone = "base" | "shade" | "light";
+type PixelRect = { x: number; y: number; w?: number; h?: number; tone?: PixelTone; opacity?: number };
+type PixelPalette = { base: string; shade: string; light: string };
+
+function PixelSvg({ pixels, className, palette }: { pixels: PixelRect[]; className?: string; palette: PixelPalette }) {
+  const fillForTone = (tone: PixelTone = "base") => {
+    if (tone === "shade") return palette.shade;
+    if (tone === "light") return palette.light;
+    return palette.base;
+  };
+
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      className={className}
+      style={{ imageRendering: "pixelated", shapeRendering: "crispEdges" }}
+    >
+      {pixels.map((pixel, index) => (
+        <rect
+          key={index}
+          x={pixel.x}
+          y={pixel.y}
+          width={pixel.w ?? 1}
+          height={pixel.h ?? 1}
+          fill={fillForTone(pixel.tone)}
+          opacity={pixel.opacity ?? 1}
+        />
+      ))}
+    </svg>
+  );
+}
+
+function navPalette(active: boolean): PixelPalette {
+  return active
+    ? { base: "var(--accent)", shade: "color-mix(in srgb, var(--accent) 72%, black)", light: "color-mix(in srgb, var(--accent) 55%, white)" }
+    : { base: "var(--text)", shade: "color-mix(in srgb, var(--text) 62%, black)", light: "color-mix(in srgb, var(--text) 35%, white)" };
+}
+
+function NavPixelIcon({ name, active }: { name: NavIconName; active: boolean }) {
+  const baseClass = "h-4 w-4";
+  const palette = navPalette(active);
+
+  switch (name) {
+    case "agents":
+      return (
+        <PixelSvg
+          className={baseClass}
+          palette={palette}
+          pixels={[
+            { x: 5, y: 1, w: 6, h: 1, tone: "light" },
+            { x: 4, y: 2, w: 8, h: 1, tone: "base" },
+            { x: 3, y: 3, w: 10, h: 2, tone: "base" },
+            { x: 4, y: 5, w: 8, h: 1, tone: "shade" },
+            { x: 2, y: 7, w: 12, h: 1, tone: "base" },
+            { x: 1, y: 8, w: 3, h: 5, tone: "shade" },
+            { x: 6, y: 8, w: 4, h: 2, tone: "light", opacity: 0.95 },
+            { x: 12, y: 8, w: 3, h: 5, tone: "shade" },
+            { x: 5, y: 10, w: 6, h: 4, tone: "base" },
+            { x: 6, y: 6, w: 1, h: 1, tone: "light", opacity: 0.65 },
+            { x: 9, y: 6, w: 1, h: 1, tone: "light", opacity: 0.65 },
+          ]}
+        />
+      );
+    case "pixelOffice":
+      return (
+        <PixelSvg
+          className={baseClass}
+          palette={palette}
+          pixels={[
+            { x: 1, y: 4, w: 14, h: 1, tone: "shade" },
+            { x: 1, y: 5, w: 2, h: 8, tone: "base" },
+            { x: 13, y: 5, w: 2, h: 8, tone: "base" },
+            { x: 5, y: 1, w: 6, h: 2, tone: "light" },
+            { x: 4, y: 3, w: 8, h: 1, tone: "base" },
+            { x: 4, y: 7, w: 3, h: 3, tone: "shade" },
+            { x: 9, y: 7, w: 3, h: 3, tone: "shade" },
+            { x: 6, y: 10, w: 4, h: 3, tone: "light", opacity: 0.9 },
+          ]}
+        />
+      );
+    case "models":
+      return (
+        <PixelSvg
+          className={baseClass}
+          palette={palette}
+          pixels={[
+            { x: 5, y: 1, w: 6, h: 1, tone: "light" },
+            { x: 3, y: 3, w: 10, h: 1, tone: "base" },
+            { x: 2, y: 5, w: 12, h: 1, tone: "shade" },
+            { x: 3, y: 7, w: 10, h: 1, tone: "base" },
+            { x: 5, y: 9, w: 6, h: 1, tone: "light" },
+            { x: 4, y: 2, w: 1, h: 1, tone: "light", opacity: 0.8 },
+            { x: 11, y: 2, w: 1, h: 1, tone: "light", opacity: 0.8 },
+            { x: 1, y: 4, w: 1, h: 2, tone: "shade", opacity: 0.9 },
+            { x: 14, y: 4, w: 1, h: 2, tone: "shade", opacity: 0.9 },
+            { x: 4, y: 11, w: 1, h: 2, tone: "shade", opacity: 0.9 },
+            { x: 11, y: 11, w: 1, h: 2, tone: "shade", opacity: 0.9 },
+            { x: 6, y: 13, w: 4, h: 1, tone: "base" },
+          ]}
+        />
+      );
+    case "sessions":
+      return (
+        <PixelSvg
+          className={baseClass}
+          palette={palette}
+          pixels={[
+            { x: 2, y: 3, w: 10, h: 7, tone: "base" },
+            { x: 4, y: 10, w: 4, h: 2, tone: "shade" },
+            { x: 10, y: 10, w: 2, h: 2, tone: "shade" },
+            { x: 4, y: 5, w: 6, h: 1, tone: "light", opacity: 0.6 },
+            { x: 4, y: 7, w: 4, h: 1, tone: "light", opacity: 0.6 },
+            { x: 11, y: 6, w: 3, h: 5, tone: "shade", opacity: 0.9 },
+            { x: 12, y: 5, w: 2, h: 1, tone: "light", opacity: 0.85 },
+          ]}
+        />
+      );
+    case "stats":
+      return (
+        <PixelSvg
+          className={baseClass}
+          palette={palette}
+          pixels={[
+            { x: 2, y: 12, w: 12, h: 1, tone: "shade", opacity: 0.7 },
+            { x: 3, y: 9, w: 2, h: 3, tone: "base" },
+            { x: 7, y: 6, w: 2, h: 6, tone: "base" },
+            { x: 11, y: 3, w: 2, h: 9, tone: "light" },
+            { x: 2, y: 4, w: 2, h: 2, tone: "shade", opacity: 0.65 },
+            { x: 5, y: 2, w: 2, h: 2, tone: "light", opacity: 0.65 },
+          ]}
+        />
+      );
+    case "alerts":
+      return (
+        <PixelSvg
+          className={baseClass}
+          palette={palette}
+          pixels={[
+            { x: 7, y: 1, w: 2, h: 1, tone: "light" },
+            { x: 5, y: 2, w: 6, h: 1, tone: "base" },
+            { x: 4, y: 3, w: 8, h: 1, tone: "base" },
+            { x: 4, y: 4, w: 8, h: 5, tone: "shade" },
+            { x: 3, y: 9, w: 10, h: 2, tone: "base" },
+            { x: 6, y: 12, w: 4, h: 1, tone: "light" },
+            { x: 5, y: 13, w: 6, h: 1, tone: "shade", opacity: 0.8 },
+          ]}
+        />
+      );
+    case "skills":
+      return (
+        <PixelSvg
+          className={baseClass}
+          palette={palette}
+          pixels={[
+            { x: 6, y: 1, w: 4, h: 2, tone: "light" },
+            { x: 4, y: 3, w: 8, h: 2, tone: "base" },
+            { x: 2, y: 5, w: 12, h: 6, tone: "shade" },
+            { x: 4, y: 11, w: 8, h: 2, tone: "base" },
+            { x: 6, y: 13, w: 4, h: 2, tone: "light" },
+            { x: 7, y: 6, w: 2, h: 4, tone: "base", opacity: 0.5 },
+            { x: 5, y: 7, w: 6, h: 2, tone: "light", opacity: 0.45 },
+          ]}
+        />
+      );
+  }
+}
+
+function NavItemIcon({ name, active }: { name: NavIconName; active: boolean }) {
+  return (
+    <span
+      className={`inline-flex h-8 w-8 items-center justify-center border transition-colors ${
+        active
+          ? "border-[var(--accent)]/45 bg-[var(--accent)]/14"
+          : "border-[var(--border)] bg-[var(--bg)]/88"
+      }`}
+      style={{
+        borderRadius: 0,
+        boxShadow: active
+          ? "inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -2px 0 rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.04)"
+          : "inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -2px 0 rgba(0,0,0,0.1)",
+      }}
+    >
+      <NavPixelIcon name={name} active={active} />
+    </span>
+  );
+}
+
+const NAV_ITEMS: { group: string; items: { href: string; icon: NavIconName; labelKey: string }[] }[] = [
   {
     group: "nav.overview",
     items: [
-      { href: "/", icon: "🤖", labelKey: "nav.agents" },
-      { href: "/pixel-office", icon: "🎮", labelKey: "nav.pixelOffice" },
-      { href: "/models", icon: "🧠", labelKey: "nav.models" },
+      { href: "/", icon: "agents", labelKey: "nav.agents" },
+      { href: "/pixel-office", icon: "pixelOffice", labelKey: "nav.pixelOffice" },
+      { href: "/models", icon: "models", labelKey: "nav.models" },
     ],
   },
   {
     group: "nav.monitor",
     items: [
-      { href: "/sessions", icon: "💬", labelKey: "nav.sessions" },
-      { href: "/stats", icon: "📊", labelKey: "nav.stats" },
-      { href: "/alerts", icon: "🔔", labelKey: "nav.alerts" },
+      { href: "/sessions", icon: "sessions", labelKey: "nav.sessions" },
+      { href: "/stats", icon: "stats", labelKey: "nav.stats" },
+      { href: "/alerts", icon: "alerts", labelKey: "nav.alerts" },
     ],
   },
   {
     group: "nav.config",
     items: [
-      { href: "/skills", icon: "🧩", labelKey: "nav.skills" },
+      { href: "/skills", icon: "skills", labelKey: "nav.skills" },
     ],
   },
 ];
@@ -341,7 +530,7 @@ export function Sidebar() {
                                   : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--bg)]"
                               }`}
                             >
-                              <span className="text-base">{item.icon}</span>
+                              <NavItemIcon name={item.icon} active={active} />
                               {t(item.labelKey)}
                             </Link>
                           );
@@ -513,7 +702,7 @@ export function Sidebar() {
                           gap: collapsed ? 0 : 10,
                         }}
                       >
-                        <span className="text-base">{item.icon}</span>
+                        <NavItemIcon name={item.icon} active={active} />
                         {!collapsed && t(item.labelKey)}
                       </Link>
                     );

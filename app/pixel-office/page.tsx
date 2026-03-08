@@ -221,6 +221,7 @@ export default function PixelOfficePage() {
   const panRef = useRef<{ x: number; y: number }>(cachedPan)
   const savedLayoutRef = useRef<OfficeLayout | null>(cachedSavedLayout)
   const animationFrameIdRef = useRef<number | null>(null)
+  const officeReadyRef = useRef<boolean>(false)
   const prevAgentStatesRef = useRef<Map<string, string>>(new Map(cachedPrevAgentStates))
   const seenSubagentEventKeysRef = useRef<Map<string, number>>(new Map())
 
@@ -382,6 +383,10 @@ export default function PixelOfficePage() {
     return () => mql.removeEventListener("change", apply)
   }, [])
 
+  useEffect(() => {
+    officeReadyRef.current = officeReady
+  }, [officeReady])
+
   // Load saved layout and sound preference
   useEffect(() => {
     const loadLayout = async () => {
@@ -442,6 +447,23 @@ export default function PixelOfficePage() {
       }
     }
   }, [])
+
+  useEffect(() => {
+    const office = officeRef.current
+    if (!officeReady || !office || cachedAgents.length === 0) return
+
+    for (const [agentId, charId] of agentIdMapRef.current) {
+      office.removeAllSubagents(charId)
+      office.removeAgent(charId)
+      agentIdMapRef.current.delete(agentId)
+    }
+    nextIdRef.current.current = 1
+
+    setAgents(cachedAgents)
+    syncAgentsToOffice(cachedAgents, office, agentIdMapRef.current, nextIdRef.current)
+    cachedAgentIdMap = new Map(agentIdMapRef.current)
+    cachedNextCharacterId = nextIdRef.current.current
+  }, [officeReady])
 
   useEffect(() => {
     if (soundOn) {
@@ -718,7 +740,7 @@ export default function PixelOfficePage() {
   useEffect(() => {
     if (cachedAgents.length > 0) {
       setAgents(cachedAgents)
-      if (officeRef.current) {
+      if (officeRef.current && officeReadyRef.current) {
         syncAgentsToOffice(cachedAgents, officeRef.current, agentIdMapRef.current, nextIdRef.current)
       }
     }
@@ -731,7 +753,7 @@ export default function PixelOfficePage() {
         cachedAgents = newAgents
 
         const office = officeRef.current
-        if (office) {
+        if (office && officeReadyRef.current) {
           syncAgentsToOffice(newAgents, office, agentIdMapRef.current, nextIdRef.current)
           cachedAgentIdMap = new Map(agentIdMapRef.current)
           cachedNextCharacterId = nextIdRef.current.current

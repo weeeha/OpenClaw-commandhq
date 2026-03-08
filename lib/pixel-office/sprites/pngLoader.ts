@@ -7,13 +7,9 @@ import { setWallSprites } from '../wallTiles'
  * Load a PNG image and convert it to SpriteData (2D array of hex color strings).
  * Transparent pixels become '' (empty string).
  */
-function pngToSpriteData(img: HTMLImageElement): SpriteData {
-  const canvas = document.createElement('canvas')
-  canvas.width = img.width
-  canvas.height = img.height
+function canvasToSpriteData(canvas: HTMLCanvasElement): SpriteData {
   const ctx = canvas.getContext('2d')!
-  ctx.drawImage(img, 0, 0)
-  const imageData = ctx.getImageData(0, 0, img.width, img.height)
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
   const { data, width, height } = imageData
 
   const result: string[][] = []
@@ -33,6 +29,15 @@ function pngToSpriteData(img: HTMLImageElement): SpriteData {
   return result
 }
 
+function pngToSpriteData(img: HTMLImageElement): SpriteData {
+  const canvas = document.createElement('canvas')
+  canvas.width = img.width
+  canvas.height = img.height
+  const ctx = canvas.getContext('2d')!
+  ctx.drawImage(img, 0, 0)
+  return canvasToSpriteData(canvas)
+}
+
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image()
@@ -40,6 +45,76 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     img.onerror = reject
     img.src = src
   })
+}
+
+function normalizedSpriteData(img: HTMLImageElement, targetWidth?: number, targetHeight?: number): SpriteData {
+  const canvas = document.createElement('canvas')
+  const shouldResize =
+    typeof targetWidth === 'number' &&
+    typeof targetHeight === 'number' &&
+    img.width !== targetWidth &&
+    img.height !== targetHeight &&
+    img.width % targetWidth === 0 &&
+    img.height % targetHeight === 0
+
+  if (shouldResize) {
+    canvas.width = targetWidth
+    canvas.height = targetHeight
+    const ctx = canvas.getContext('2d')!
+    ctx.imageSmoothingEnabled = false
+    ctx.drawImage(img, 0, 0, targetWidth, targetHeight)
+    return canvasToSpriteData(canvas)
+  }
+
+  return pngToSpriteData(img)
+}
+
+function stripOpaqueSheetBackground(sprite: SpriteData): SpriteData {
+  if (sprite.length === 0 || sprite[0].length === 0) return sprite
+  if (sprite.some((row) => row.some((pixel) => pixel === ''))) return sprite
+
+  const height = sprite.length
+  const width = sprite[0].length
+  const result = sprite.map((row) => [...row])
+  const visited = Array.from({ length: height }, () => Array(width).fill(false))
+  const queue: Array<[number, number]> = []
+
+  const brightness = (hex: string): number => {
+    const r = parseInt(hex.slice(1, 3), 16)
+    const g = parseInt(hex.slice(3, 5), 16)
+    const b = parseInt(hex.slice(5, 7), 16)
+    return 0.299 * r + 0.587 * g + 0.114 * b
+  }
+
+  const corners = [sprite[0][0], sprite[0][width - 1], sprite[height - 1][0], sprite[height - 1][width - 1]]
+  const threshold = Math.max(140, Math.min(...corners.map((pixel) => brightness(pixel))) - 12)
+
+  const enqueue = (x: number, y: number) => {
+    if (visited[y][x]) return
+    if (brightness(result[y][x]) < threshold) return
+    visited[y][x] = true
+    queue.push([x, y])
+  }
+
+  for (let x = 0; x < width; x++) {
+    enqueue(x, 0)
+    enqueue(x, height - 1)
+  }
+  for (let y = 0; y < height; y++) {
+    enqueue(0, y)
+    enqueue(width - 1, y)
+  }
+
+  while (queue.length > 0) {
+    const [x, y] = queue.shift()!
+    result[y][x] = ''
+    if (x > 0) enqueue(x - 1, y)
+    if (x + 1 < width) enqueue(x + 1, y)
+    if (y > 0) enqueue(x, y - 1)
+    if (y + 1 < height) enqueue(x, y + 1)
+  }
+
+  return result
 }
 
 /**
@@ -74,16 +149,33 @@ function parseCharacterSheet(sheet: SpriteData): LoadedCharacterData {
 
 /**
  * Load character PNGs from /assets/pixel-office/characters/ and register them.
- * Falls back silently to hardcoded templates if loading fails.
+ * Loads the default set plus any extra contiguous char_N.png files.
+ * Falls back silently to hardcoded templates if the base set fails.
  */
 export async function loadCharacterPNGs(): Promise<boolean> {
   try {
     const characters: LoadedCharacterData[] = []
-    for (let i = 0; i < 6; i++) {
+    const baseCharacterCount = 6
+    const maxCharacterCount = 64
+    const CHARACTER_SHEET_WIDTH = 112
+    const CHARACTER_SHEET_HEIGHT = 96
+
+    for (let i = 0; i < baseCharacterCount; i++) {
       const img = await loadImage(`/assets/pixel-office/characters/char_${i}.png`)
-      const sheet = pngToSpriteData(img)
+      const sheet = stripOpaqueSheetBackground(normalizedSpriteData(img, CHARACTER_SHEET_WIDTH, CHARACTER_SHEET_HEIGHT))
       characters.push(parseCharacterSheet(sheet))
     }
+
+    for (let i = baseCharacterCount; i < maxCharacterCount; i++) {
+      try {
+        const img = await loadImage(`/assets/pixel-office/characters/char_${i}.png`)
+        const sheet = stripOpaqueSheetBackground(normalizedSpriteData(img, CHARACTER_SHEET_WIDTH, CHARACTER_SHEET_HEIGHT))
+        characters.push(parseCharacterSheet(sheet))
+      } catch {
+        break
+      }
+    }
+
     setCharacterTemplates(characters)
     return true
   } catch (e) {

@@ -1123,6 +1123,10 @@ export interface LoadedCharacterData {
 
 let loadedCharacters: LoadedCharacterData[] | null = null
 
+export function getAvailableCharacterVariantCount(): number {
+  return loadedCharacters?.length ?? CHARACTER_PALETTES.length
+}
+
 /** Set pre-colored character sprites loaded from PNG assets. Call this when characterSpritesLoaded message arrives. */
 export function setCharacterTemplates(data: LoadedCharacterData[]): void {
   loadedCharacters = data

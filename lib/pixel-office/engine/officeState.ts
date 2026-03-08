@@ -1,6 +1,5 @@
 import { TILE_SIZE, MATRIX_EFFECT_DURATION, CharacterState, Direction } from '../types'
 import {
-  PALETTE_COUNT,
   HUE_SHIFT_MIN_DEG,
   HUE_SHIFT_RANGE_DEG,
   WAITING_BUBBLE_DURATION_SEC,
@@ -15,6 +14,7 @@ import {
 } from '../constants'
 import type { Character, Seat, FurnitureInstance, TileType as TileTypeVal, OfficeLayout, PlacedFurniture } from '../types'
 import { createCharacter, updateCharacter } from './characters'
+import { CHARACTER_PALETTES, getAvailableCharacterVariantCount } from '../sprites/spriteData'
 import { matrixEffectSeeds } from './matrixEffect'
 import { isWalkable, getWalkableTiles, findPath } from '../layout/tileMap'
 import {
@@ -371,23 +371,26 @@ export class OfficeState {
 
   /**
    * Pick a diverse palette for a new agent based on currently active agents.
-   * First 6 agents each get a unique skin (random order). Beyond 6, skins
+   * First round uses each available character variant once (random order).
+   * Beyond that, variants
    * repeat in balanced rounds with a random hue shift (≥45°).
    */
   private pickDiversePalette(): { palette: number; hueShift: number } {
-    // Count how many non-sub-agents use each base palette (0-5)
-    const counts = new Array(PALETTE_COUNT).fill(0) as number[]
+    const paletteCount = getAvailableCharacterVariantCount()
+    const counts = new Array(paletteCount).fill(0) as number[]
     for (const ch of this.characters.values()) {
       if (ch.isSubagent) continue
-      counts[ch.palette]++
+      counts[ch.palette % paletteCount]++
     }
     const minCount = Math.min(...counts)
-    // Available = palettes at the minimum count (least used)
+    // Available = variants at the minimum count (least used)
     const available: number[] = []
-    for (let i = 0; i < PALETTE_COUNT; i++) {
+    for (let i = 0; i < paletteCount; i++) {
       if (counts[i] === minCount) available.push(i)
     }
-    const palette = available[Math.floor(Math.random() * available.length)]
+    const extraVariants = available.filter((index) => index >= CHARACTER_PALETTES.length)
+    const preferred = minCount === 0 && extraVariants.length > 0 ? extraVariants : available
+    const palette = preferred[Math.floor(Math.random() * preferred.length)]
     // First round (minCount === 0): no hue shift. Subsequent rounds: random ≥45°.
     let hueShift = 0
     if (minCount > 0) {
