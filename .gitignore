@@ -6,3 +6,9 @@ next-env.d.ts
 .DS_Store
 /.openclaw
 /public/assets/pixel-office/*.mp3
+
+# local bot config + env — never commit
+myconfig.txt
+.env
+.env.*
+!.env.example
