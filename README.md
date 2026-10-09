@@ -50,20 +50,22 @@ cd OpenClaw-bot-review
 npm install
 
 # Start dev server
-npm run start
+npm run dev
 ```
+
+For a production run, build first: `npm run build`, then `node .next/standalone/server.js` (the project uses Next.js `output: 'standalone'`). `npm run start` only works after a build.
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Tech Stack
 
-- Next.js + TypeScript
-- Tailwind CSS
+- Next.js 16 + React 19 + TypeScript
+- Tailwind CSS 4
 - No database — reads config file directly
 
 ## Requirements
 
-- Node.js 18+
+- Node.js 20.9+ (required by Next.js 16)
 - OpenClaw installed with config at `~/.openclaw/openclaw.json`
 
 ## Configuration
@@ -72,7 +74,7 @@ By default, the dashboard reads config from `~/.openclaw/openclaw.json`. To use 
 
 ```bash
 OPENCLAW_HOME=/opt/openclaw 
-npm run start
+npm run dev
 ```
 
 ## Docker Deployment
@@ -146,20 +148,22 @@ cd OpenClaw-bot-review
 npm install
 
 # 启动开发服务器
-npm run start
+npm run dev
 ```
+
+生产运行需先构建：`npm run build`，然后 `node .next/standalone/server.js`（项目使用 Next.js `output: 'standalone'`）。`npm run start` 仅在构建之后可用。
 
 浏览器打开 [http://localhost:3000](http://localhost:3000) 即可。
 
 ## 技术栈
 
-- Next.js + TypeScript
-- Tailwind CSS
+- Next.js 16 + React 19 + TypeScript
+- Tailwind CSS 4
 - 无数据库 — 直接读取配置文件
 
 ## 环境要求
 
-- Node.js 18+
+- Node.js 20.9+ (required by Next.js 16)
 - 已安装 OpenClaw，配置文件位于 `~/.openclaw/openclaw.json`
 
 ## 自定义配置路径
@@ -168,7 +172,7 @@ npm run start
 
 ```bash
 OPENCLAW_HOME=/opt/openclaw 
-npm run start
+npm run dev
 ```
 
 ## 作者联系方式（contact）
